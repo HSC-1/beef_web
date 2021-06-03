@@ -1,34 +1,50 @@
 from flask import Flask, render_template, request
-import os
-import cv2
 import numpy as np
-from tensorflow.python.ops.gen_math_ops import select
+from PIL import Image
 from predict import predict
+import os
 app = Flask(__name__)
 
 '''
-모델에 넣기 위해
-이미지 255*255 로 만들고 넣어야 함 
+predict.py 에 경로를 자신의 컴퓨터상황에 맞춰서 하시면 끝납니다.
+모델에 넣기 위해 이미지 255*255 로 만들고 넣어야 함 
+
+index.html에 주석을 몰라 여기다 적겠습니다. 
+일단 우리의 Css를 적용하기 위해서 원래 링크에 주소를 적으면 되지만 flask에서 사용하기 위해서는 url_for에 감싸서 넣어야합니다.
+
+
 '''
-@app.route('/index')
-def index():
-    return render_template('index.html')
+UPLOAD_FOLDER = os.getenv('HOME') + '/beef_web/static'  
+# route 뒤에 '/'를 바꾸면 자기가 원하는 도메인주소에 열림
+@app.route('/', methods=['GET','POST'])
+def prediction():
+    if request.method == "POST":
+        file = request.files["image"] # 여기에 우리 업로드 되는 이름 넣으면 됨
+        if file:
+            img_loc = os.path.join(UPLOAD_FOLDER,file.filename)
+            file.save(img_loc)
+            img = Image.open(file)
+            img = np.array(img.resize((256,256))).reshape(256,256,3)
+            label = predict(img)
+            prime = label[0][0]
+            choice= label[0][1]
+            Select= label[0][2]
+            max_prob = max([prime,choice,Select])
+            max_label = [prime,choice,Select].index(max([prime,choice,Select]))
+            # 이름 넣기위한 코드(하) 
+            if max_label == 0:
+                max_label = 'Prime'
+            elif max_label == 1:
+                max_label = 'Choice'
+            elif max_label == 2:
+                max_label = 'Select'
+            return render_template('index.html',img_loc=file.filename,max=round(max_prob,2),max_label=max_label ,prime = round(prime,2), choice= round(choice,2), Select= round(Select,2), label='등급')
+    return render_template('index.html' ,label='고기 사진 주세요')
+
 
 @app.route('/test', methods=['GET','POST'])
-def prediction():
-    # if request.method == 'POST':
-    # img = request.form.get('image')
-    # print(img)
-    file = request.files["image"] # 여기에 우리 업로드 되는 이름 넣으면 됨
-    if 'file' not in request.files:
-        return render_template('predict.html', label='No file')
-    # if not file: return render_template('index.html', label="No Files")
-    # img = cv2.imread(file).reshape(256,256,3)
-    # # img = np.array(img.reshape(256,256,3))
-    # label = predict(img)
-    # print(label) label=label[0][1], prime=label[0][0]
-    return render_template('predict.html' ,label=file)
-
+def show():
+    return render_template('index.html')
 
 
 if __name__ == '__main__':
